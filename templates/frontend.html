@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍎 水果种类及新鲜度检测系统</title>
+<style>
+/* ============ 全局样式 ============ */
+:root {
+    --green: #16a34a; --green-bg: #f0fdf4; --green-border: #86efac;
+    --yellow: #ca8a04; --yellow-bg: #fefce8; --yellow-border: #fde047;
+    --red: #dc2626; --red-bg: #fef2f2; --red-border: #fca5a5;
+    --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+    --gray-400: #9ca3af; --gray-600: #4b5563; --gray-700: #374151; --gray-800: #1f2937;
+    --radius: 12px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: #f1f5f9; color: var(--gray-800); min-height: 100vh;
+}
+.container { max-width: 900px; margin: 0 auto; padding: 20px; }
+
+/* ============ 头部 ============ */
+.header {
+    background: linear-gradient(135deg, #166534, #22c55e);
+    color: #fff; text-align: center; padding: 30px 20px; border-radius: var(--radius);
+    margin-bottom: 20px; box-shadow: 0 4px 20px rgba(22,101,52,0.3);
+}
+.header h1 { font-size: 28px; margin-bottom: 6px; }
+.header p { opacity: 0.9; font-size: 14px; }
+
+/* ============ 卡片 ============ */
+.card {
+    background: #fff; border-radius: var(--radius); padding: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08); margin-bottom: 16px;
+}
+
+/* ============ Tab 切换 ============ */
+.tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+.tab-btn {
+    padding: 10px 20px; border: 2px solid var(--gray-200); border-radius: 20px;
+    background: #fff; cursor: pointer; font-size: 14px; transition: all 0.2s;
+    color: var(--gray-600); font-family: inherit;
+}
+.tab-btn:hover { border-color: #22c55e; color: #16a34a; }
+.tab-btn.active { background: #16a34a; color: #fff; border-color: #16a34a; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ============ 上传区域 ============ */
+.upload-zone {
+    border: 2px dashed var(--gray-400); border-radius: var(--radius);
+    padding: 40px 20px; text-align: center; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    color: var(--gray-600);
+}
+.upload-zone:hover, .upload-zone.drag-over {
+    border-color: #22c55e; background: var(--green-bg);
+}
+.upload-zone .icon { font-size: 48px; margin-bottom: 10px; }
+.upload-zone .hint { font-size: 13px; color: var(--gray-400); margin-top: 6px; }
+
+/* ============ 图片预览 ============ */
+.preview-box { text-align: center; margin-top: 16px; }
+.preview-box img {
+    max-width: 300px; max-height: 300px; border-radius: var(--radius);
+    border: 2px solid var(--gray-200); object-fit: cover;
+}
+
+/* ============ 按钮 ============ */
+.btn {
+    display: inline-block; padding: 12px 28px; border: none; border-radius: 24px;
+    font-size: 15px; cursor: pointer; transition: all 0.2s; font-family: inherit;
+}
+.btn-primary { background: #16a34a; color: #fff; font-weight: 600; }
+.btn-primary:hover { background: #15803d; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(22,163,74,0.4); }
+.btn-sm { padding: 6px 14px; font-size: 13px; }
+.btn-outline { background: #fff; color: #dc2626; border: 1px solid #dc2626; }
+.btn-outline:hover { background: #fef2f2; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* ============ 结果展示 ============ */
+.result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 16px; }
+@media (max-width: 640px) { .result-grid { grid-template-columns: 1fr; } }
+
+.result-main {
+    text-align: center; padding: 24px; border-radius: var(--radius);
+    background: var(--green-bg); border: 2px solid var(--green-border);
+}
+.result-main .emoji { font-size: 56px; }
+.result-main .class-name { font-size: 22px; font-weight: 700; color: #166534; margin: 8px 0; }
+.result-main .confidence-text { font-size: 16px; color: #15803d; margin-bottom: 12px; }
+
+/* 置信度进度条 */
+.conf-bar-outer { height: 10px; background: var(--gray-200); border-radius: 10px; overflow: hidden; }
+.conf-bar-inner { height: 100%; border-radius: 10px; transition: width 0.6s ease; }
+
+/* 各类概率条 */
+.prob-list { }
+.prob-item { display: flex; align-items: center; margin-bottom: 8px; gap: 8px; }
+.prob-label { width: 70px; font-size: 13px; text-align: right; flex-shrink: 0; }
+.prob-bar-outer { flex: 1; height: 22px; background: var(--gray-100); border-radius: 6px; overflow: hidden; position: relative; }
+.prob-bar-inner { height: 100%; border-radius: 6px; background: #22c55e; transition: width 0.6s ease; display: flex; align-items: center; padding-left: 8px; }
+.prob-value { font-size: 12px; color: #fff; font-weight: 600; min-width: 40px; }
+
+/* 低置信度警示 */
+.warning-box {
+    margin-top: 16px; padding: 12px 16px; border-radius: 8px;
+    background: var(--yellow-bg); border: 1px solid var(--yellow-border);
+    color: var(--yellow); font-size: 14px;
+}
+
+/* ============ 批量结果表格 ============ */
+.result-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; }
+.result-table th, .result-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--gray-200); }
+.result-table th { background: var(--gray-50); font-weight: 600; color: var(--gray-600); }
+.result-table tr:hover { background: var(--gray-50); }
+.conf-tag {
+    padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; display: inline-block;
+}
+.conf-high { background: #dcfce7; color: #166534; }
+.conf-mid  { background: #fef3c7; color: #92400e; }
+.conf-low  { background: #fee2e2; color: #991b1b; }
+
+/* ============ 摄像头 ============ */
+.camera-container { text-align: center; }
+.camera-container video { border-radius: var(--radius); max-width: 100%; max-height: 350px; border: 2px solid var(--gray-200); }
+.camera-container canvas { display: none; }
+
+/* ============ 模型信息 ============ */
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .info-grid { grid-template-columns: 1fr; } }
+.info-item { background: var(--gray-50); padding: 12px 16px; border-radius: 8px; }
+.info-item .label { font-size: 12px; color: var(--gray-400); }
+.info-item .value { font-size: 15px; font-weight: 600; color: var(--gray-800); }
+
+/* ============ 历史记录 ============ */
+.history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.history-table th, .history-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--gray-200); }
+.history-table th { background: var(--gray-50); color: var(--gray-600); font-weight: 600; }
+
+/* ============ 加载动画 ============ */
+.spinner {
+    display: inline-block; width: 20px; height: 20px; border: 3px solid var(--gray-200);
+    border-top-color: #22c55e; border-radius: 50%; animation: spin 0.6s linear infinite;
+    vertical-align: middle; margin-right: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============ 文件列表 ============ */
+.file-list { margin-top: 12px; }
+.file-chip {
+    display: inline-block; padding: 4px 12px; margin: 4px; background: var(--gray-100);
+    border-radius: 16px; font-size: 13px; color: var(--gray-700);
+}
+.file-chip .remove { cursor: pointer; margin-left: 4px; color: #dc2626; font-weight: bold; }
+
+/* ============ 服务器状态指示 ============ */
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.status-dot.online { background: #22c55e; }
+.status-dot.offline { background: #dc2626; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <!-- ===== 头部 ===== -->
+    <div class="header">
+        <h1>🍎 水果种类及新鲜度检测系统</h1>
+        <p>基于 MobileNetV2 深度学习模型 | 6类水果新鲜度识别</p>
+        <p style="font-size:12px;margin-top:4px;opacity:0.7" id="serverStatus">🔗 等待服务连接...</p>
+    </div>
+
+    <!-- ===== Tab 切换 ===== -->
+    <div class="card">
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('single')">📁 单张识别</button>
+            <button class="tab-btn" onclick="switchTab('batch')">📦 批量识别</button>
+            <button class="tab-btn" onclick="switchTab('camera')">📷 拍照识别</button>
+            <button class="tab-btn" onclick="switchTab('modelInfo')">ℹ️ 模型信息</button>
+        </div>
+
+        <!-- ===== Tab 1: 单张识别 ===== -->
+        <div id="tab-single" class="tab-panel active">
+            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                <div class="icon">📁</div>
+                <div>点击选择图片 或 拖拽图片到此处</div>
+                <div class="hint">支持 JPG、PNG、BMP 格式</div>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+            <div class="preview-box" id="previewBox" style="display:none"></div>
+            <div style="text-align:center;margin-top:16px;" id="btnArea" hidden>
+                <button class="btn btn-primary" onclick="predictSingle()" id="predictBtn">🔍 开始识别</button>
+            </div>
+            <div id="resultArea"></div>
+        </div>
+
+        <!-- ===== Tab 2: 批量识别 ===== -->
+        <div id="tab-batch" class="tab-panel">
+            <div class="upload-zone" id="batchZone" onclick="document.getElementById('batchInput').click()">
+                <div class="icon">📦</div>
+                <div>点击选择多张图片</div>
+                <div class="hint">可一次选择多张，支持 JPG、PNG、BMP</div>
+            </div>
+            <input type="file" id="batchInput" accept="image/*" multiple style="display:none" onchange="handleBatchSelect(event)">
+            <div class="file-list" id="fileList"></div>
+            <div style="text-align:center;margin-top:16px;">
+                <button class="btn btn-primary" onclick="predictBatch()" id="batchBtn" disabled>📊 批量识别</button>
+            </div>
+            <div id="batchResultArea"></div>
+        </div>
+
+        <!-- ===== Tab 3: 拍照识别 ===== -->
+        <div id="tab-camera" class="tab-panel">
+            <div class="camera-container">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas"></canvas>
+                <div style="margin-top:16px;">
+                    <button class="btn btn-primary" id="cameraStartBtn" onclick="startCamera()">📷 打开摄像头</button>
+                    <button class="btn btn-primary" id="captureBtn" onclick="capturePhoto()" style="display:none">📸 拍照并识别</button>
+                    <button class="btn btn-outline btn-sm" id="cameraStopBtn" onclick="stopCamera()" style="display:none">关闭摄像头</button>
+                </div>
+                <div id="cameraPreview" class="preview-box" style="display:none"></div>
+                <div id="cameraResult"></div>
+            </div>
+        </div>
+
+        <!-- ===== Tab 4: 模型信息 ===== -->
+        <div id="tab-modelInfo" class="tab-panel">
+            <div class="info-grid" id="modelInfoGrid">
+                <div class="info-item"><div class="label">模型架构</div><div class="value">加载中...</div></div>
+            </div>
+            <div style="text-align:center;margin-top:12px;">
+                <button class="btn btn-outline btn-sm" onclick="loadModelInfo()">🔄 刷新信息</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 历史记录 ===== -->
+    <div class="card">
+        <h3 style="margin-bottom:12px;">📝 最近识别记录</h3>
+        <div id="historyArea">
+            <p style="color:var(--gray-400);font-size:14px;">暂无记录</p>
+        </div>
+        <div style="text-align:right;margin-top:12px;">
+            <button class="btn btn-outline btn-sm" onclick="clearHistory()">🗑️ 清空记录</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============ 脚本 ============ -->
+<script>
+// ==================== 配置 ====================
+const API_BASE = 'http://127.0.0.1:5000';  // 后端地址
+
+// 类别信息（前端也存一份，后端不可用时有回退）
+const CLASS_NAMES = ['新鲜苹果', '新鲜香蕉', '新鲜橘子', '腐烂苹果', '腐烂香蕉', '腐烂橘子'];
+const CLASS_EMOJI = ['🍎', '🍌', '🍊', '🥀', '🟤', '🟠'];
+
+// ==================== 服务状态检查 ====================
+async function checkServer() {
+    try {
+        const res = await fetch(`${API_BASE}/api/model_info`);
+        if (res.ok) {
+            document.getElementById('serverStatus').innerHTML =
+                '<span class="status-dot online"></span>服务已连接';
+        }
+    } catch(e) {
+        document.getElementById('serverStatus').innerHTML =
+            '<span class="status-dot offline"></span>⚠️ 服务未连接，请先运行 backend.py';
+    }
+}
+checkServer();
+
+// ==================== Tab 切换 ====================
+function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach((b,i) => {
+        b.classList.toggle('active', false);
+    });
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    // 找到对应 tab 按钮
+    const tabs = ['single', 'batch', 'camera', 'modelInfo'];
+    const idx = tabs.indexOf(name);
+    document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+    if (name === 'modelInfo') loadModelInfo();
+}
+
+// ==================== 拖拽上传 ====================
+const uploadZone = document.getElementById('uploadZone');
+if (uploadZone) {
+    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+    uploadZone.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadZone.classList.remove('drag-over');
+        if (e.dataTransfer.files.length > 0) {
+            handleFile(e.dataTransfer.files[0]);
+        }
+    });
+}
+
+// ==================== 单张识别 ====================
+let selectedFile = null;
+
+function handleFileSelect(event) {
+    if (event.target.files.length > 0) handleFile(event.target.files[0]);
+}
+
+function handleFile(file) {
+    selectedFile = file;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const box = document.getElementById('previewBox');
+        box.style.display = 'block';
+        box.innerHTML = `<img src="${e.target.result}" alt="预览">`;
+        document.getElementById('btnArea').hidden = false;
+        document.getElementById('resultArea').innerHTML = '';
+    };
+    reader.readAsDataURL(file);
+}
+
+async function predictSingle() {
+    if (!selectedFile) return;
+    const btn = document.getElementById('predictBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>识别中...';
+    document.getElementById('resultArea').innerHTML = '';
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+        const res = await fetch(`${API_BASE}/api/predict`, { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.error) {
+            document.getElementById('resultArea').innerHTML = `<p style="color:red">❌ ${data.error}</p>`;
+        } else {
+            showResult(data);
+            addHistory({ time: new Date().toLocaleTimeString(), result: data.pred_class,
+                confidence: data.confidence + '%', mode: '单张上传', emoji: data.pred_emoji });
+        }
+    } catch(e) {
+        document.getElementById('resultArea').innerHTML =
+            `<p style="color:red">❌ 连接失败，请确认后端已启动 (${API_BASE})</p>`;
+    }
+    btn.disabled = false;
+    btn.textContent = '🔍 开始识别';
+}
+
+function showResult(data) {
+    const conf = data.confidence;
+    let confColor = '#16a34a', confBg = '#f0fdf4', confBorder = '#86efac';
+    if (conf < 70) { confColor = '#dc2626'; confBg = '#fef2f2'; confBorder = '#fca5a5'; }
+    else if (conf < 85) { confColor = '#ca8a04'; confBg = '#fefce8'; confBorder = '#fde047'; }
+
+    let probBars = data.probabilities.map((p, i) => {
+        const bg = i === data.pred_index ? '#22c55e' : '#d1d5db';
+        return `<div class="prob-item">
+            <span class="prob-label">${CLASS_EMOJI[i]} ${CLASS_NAMES[i]}</span>
+            <div class="prob-bar-outer">
+                <div class="prob-bar-inner" style="width:${p}%;background:${bg}">
+                    <span class="prob-value">${p}%</span>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
+    let warning = conf < 70
+        ? `<div class="warning-box">⚠️ 置信度较低（<70%），建议重新拍摄更清晰的照片</div>`
+        : '';
+
+    document.getElementById('resultArea').innerHTML = `
+        <div class="result-grid">
+            <div class="result-main" style="background:${confBg};border-color:${confBorder}">
+                <div class="emoji">${data.pred_emoji}</div>
+                <div class="class-name" style="color:${confColor}">${data.pred_class}</div>
+                <div class="confidence-text" style="color:${confColor}">置信度: ${conf}%</div>
+                <div class="conf-bar-outer">
+                    <div class="conf-bar-inner" style="width:${conf}%;background:${confColor}"></div>
+                </div>
+            </div>
+            <div class="prob-list">${probBars}</div>
+        </div>
+        ${warning}
+    `;
+}
+
+// ==================== 批量识别 ====================
+let batchFiles = [];
+
+function handleBatchSelect(event) {
+    batchFiles = Array.from(event.target.files);
+    const list = document.getElementById('fileList');
+    list.innerHTML = batchFiles.map((f, i) =>
+        `<span class="file-chip">${f.name} <span class="remove" onclick="removeBatchFile(${i})">✕</span></span>`
+    ).join('');
+    document.getElementById('batchBtn').disabled = batchFiles.length === 0;
+}
+
+function removeBatchFile(idx) {
+    batchFiles.splice(idx, 1);
+    handleBatchSelect({target: {files: batchFiles}});
+}
+
+async function predictBatch() {
+    if (!batchFiles.length) return;
+    const btn = document.getElementById('batchBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>批量识别中...';
+
+    const formData = new FormData();
+    batchFiles.forEach(f => formData.append('files', f));
+
+    try {
+        const res = await fetch(`${API_BASE}/api/batch_predict`, { method: 'POST', body: formData });
+        const data = await res.json();
+        showBatchResult(data);
+    } catch(e) {
+        document.getElementById('batchResultArea').innerHTML =
+            `<p style="color:red;margin-top:16px;">❌ 连接失败，请确认后端已启动</p>`;
+    }
+    btn.disabled = false;
+    btn.textContent = '📊 批量识别';
+}
+
+function showBatchResult(data) {
+    let rows = data.results.map(r => {
+        let tagClass = 'conf-high';
+        if (r.confidence < 70) tagClass = 'conf-low';
+        else if (r.confidence < 85) tagClass = 'conf-mid';
+
+        if (r.error) return `<tr><td>${r.filename}</td><td colspan="2" style="color:red">❌ ${r.error}</td></tr>`;
+
+        return `<tr>
+            <td>${r.filename}</td>
+            <td>${r.pred_emoji} ${r.pred_class}</td>
+            <td><span class="conf-tag ${tagClass}">${r.confidence}%</span></td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('batchResultArea').innerHTML = `
+        <table class="result-table">
+            <thead><tr><th>文件名</th><th>识别结果</th><th>置信度</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+        <p style="margin-top:12px;color:var(--gray-600);font-size:13px;">共 ${data.total} 张</p>
+    `;
+}
+
+// ==================== 摄像头 ====================
+let stream = null;
+
+async function startCamera() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        document.getElementById('video').srcObject = stream;
+        document.getElementById('cameraStartBtn').style.display = 'none';
+        document.getElementById('captureBtn').style.display = 'inline-block';
+        document.getElementById('cameraStopBtn').style.display = 'inline-block';
+    } catch(e) {
+        alert('无法访问摄像头，请检查权限设置。\n错误: ' + e.message);
+    }
+}
+
+function stopCamera() {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    document.getElementById('video').srcObject = null;
+    document.getElementById('cameraStartBtn').style.display = 'inline-block';
+    document.getElementById('captureBtn').style.display = 'none';
+    document.getElementById('cameraStopBtn').style.display = 'none';
+    document.getElementById('cameraPreview').style.display = 'none';
+    document.getElementById('cameraResult').innerHTML = '';
+}
+
+async function capturePhoto() {
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+
+    // 显示预览
+    const preview = document.getElementById('cameraPreview');
+    preview.style.display = 'block';
+    preview.innerHTML = `<img src="${canvas.toDataURL('image/jpeg')}" alt="拍摄的照片">`;
+
+    // 转为 Blob 发送
+    document.getElementById('captureBtn').disabled = true;
+    document.getElementById('captureBtn').innerHTML = '<span class="spinner"></span>识别中...';
+
+    canvas.toBlob(async (blob) => {
+        const formData = new FormData();
+        formData.append('file', blob, 'camera.jpg');
+
+        try {
+            const res = await fetch(`${API_BASE}/api/predict`, { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.error) {
+                document.getElementById('cameraResult').innerHTML = `<p style="color:red;margin-top:12px;">❌ ${data.error}</p>`;
+            } else {
+                document.getElementById('cameraResult').innerHTML =
+                    `<div style="margin-top:12px;">${document.getElementById('resultArea').innerHTML || ''}</div>`;
+                // 把结果渲染到 cameraResult
+                showResultInCamera(data);
+                addHistory({ time: new Date().toLocaleTimeString(), result: data.pred_class,
+                    confidence: data.confidence + '%', mode: '拍照', emoji: data.pred_emoji });
+            }
+        } catch(e) {
+            document.getElementById('cameraResult').innerHTML =
+                `<p style="color:red;margin-top:12px;">❌ 连接失败</p>`;
+        }
+        document.getElementById('captureBtn').disabled = false;
+        document.getElementById('captureBtn').textContent = '📸 拍照并识别';
+    }, 'image/jpeg', 0.9);
+}
+
+function showResultInCamera(data) {
+    const conf = data.confidence;
+    let confColor = '#16a34a', confBg = '#f0fdf4', confBorder = '#86efac';
+    if (conf < 70) { confColor = '#dc2626'; confBg = '#fef2f2'; confBorder = '#fca5a5'; }
+    else if (conf < 85) { confColor = '#ca8a04'; confBg = '#fefce8'; confBorder = '#fde047'; }
+
+    let probBars = data.probabilities.map((p, i) => {
+        const bg = i === data.pred_index ? '#22c55e' : '#d1d5db';
+        return `<div class="prob-item">
+            <span class="prob-label">${CLASS_EMOJI[i]} ${CLASS_NAMES[i]}</span>
+            <div class="prob-bar-outer">
+                <div class="prob-bar-inner" style="width:${p}%;background:${bg}">
+                    <span class="prob-value">${p}%</span>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('cameraResult').innerHTML = `
+        <div class="result-grid">
+            <div class="result-main" style="background:${confBg};border-color:${confBorder}">
+                <div class="emoji">${data.pred_emoji}</div>
+                <div class="class-name" style="color:${confColor}">${data.pred_class}</div>
+                <div class="confidence-text" style="color:${confColor}">置信度: ${conf}%</div>
+                <div class="conf-bar-outer">
+                    <div class="conf-bar-inner" style="width:${conf}%;background:${confColor}"></div>
+                </div>
+            </div>
+            <div class="prob-list">${probBars}</div>
+        </div>
+        ${conf < 70 ? `<div class="warning-box">⚠️ 置信度较低（<70%），建议重新拍摄更清晰的照片</div>` : ''}
+    `;
+}
+
+// ==================== 模型信息 ====================
+async function loadModelInfo() {
+    try {
+        const res = await fetch(`${API_BASE}/api/model_info`);
+        const data = await res.json();
+        document.getElementById('modelInfoGrid').innerHTML = `
+            <div class="info-item"><div class="label">模型架构</div><div class="value">${data.model_name}</div></div>
+            <div class="info-item"><div class="label">预训练权重</div><div class="value">${data.pretrained}</div></div>
+            <div class="info-item"><div class="label">输入尺寸</div><div class="value">${data.input_size.join(' × ')}</div></div>
+            <div class="info-item"><div class="label">分类数</div><div class="value">${data.num_classes} 类</div></div>
+            <div class="info-item"><div class="label">框架</div><div class="value">${data.framework}</div></div>
+            <div class="info-item"><div class="label">参数量</div><div class="value">${data.parameters}</div></div>
+            <div class="info-item"><div class="label">ONNX 模型</div><div class="value">${data.onnx_available ? '✅ 已导出' : '⚠️ 未导出'}</div></div>
+            <div class="info-item"><div class="label">类别列表</div><div class="value">${data.class_emoji.join(' ')}</div></div>
+        `;
+    } catch(e) {
+        document.getElementById('modelInfoGrid').innerHTML =
+            `<p style="color:red">❌ 无法获取模型信息，请确认后端已启动</p>`;
+    }
+}
+
+// ==================== 历史记录 ====================
+function loadHistory() {
+    try { return JSON.parse(localStorage.getItem('fruit_history') || '[]'); }
+    catch(e) { return []; }
+}
+
+function addHistory(item) {
+    const history = loadHistory();
+    history.unshift(item);
+    if (history.length > 50) history.length = 50;  // 最多保留 50 条
+    localStorage.setItem('fruit_history', JSON.stringify(history));
+    renderHistory();
+}
+
+function clearHistory() {
+    localStorage.removeItem('fruit_history');
+    renderHistory();
+}
+
+function renderHistory() {
+    const history = loadHistory();
+    const area = document.getElementById('historyArea');
+    if (!history.length) {
+        area.innerHTML = '<p style="color:var(--gray-400);font-size:14px;">暂无记录</p>';
+        return;
+    }
+    const rows = history.slice(0, 20).map(h =>
+        `<tr><td>${h.time}</td><td>${h.emoji||''} ${h.result}</td><td>${h.confidence}</td><td>${h.mode}</td></tr>`
+    ).join('');
+    area.innerHTML = `
+        <table class="history-table">
+            <thead><tr><th>时间</th><th>结果</th><th>置信度</th><th>方式</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+}
+
+// ==================== 初始化 ====================
+renderHistory();
+</script>
+
+</body>
+</html>
